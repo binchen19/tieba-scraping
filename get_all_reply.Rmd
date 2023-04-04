@@ -1,5 +1,4 @@
 ```{r}
-library(rvest)
 library(tidyverse)
 ```
 
@@ -7,16 +6,6 @@ library(tidyverse)
 load("~/R/0_dissertation/saved/tieba_urls.RData")
 urls_sub <- urls_bind |>
   subset(date >= as.Date("2018-11-01") & date <= as.Date("2018-12-10"))
-
-raw <- urls_sub$url
-id <- sub(".*/(.*)\\?.*", "\\1", raw)
-```
-
-```{r}
-# Remove rows with duplicate values in Column1
-urls_unique <- urls_sub[!duplicated(urls_sub$subject),]
-urls_unique$id <- str_extract(urls_unique$url, "(?<=/p/)\\d+(?=\\?)")
-urls_unique$url_clean <- paste0('https://tieba.baidu.com/p/',urls_unique$id)
 ```
 
 ```{r}

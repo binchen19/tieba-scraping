@@ -1,0 +1,61 @@
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(xml2)
+```
+
+```{r}
+page <- c(21:39)
+
+page_url <- paste0("http://c.tieba.baidu.com/f/search/res?isnew=1&kw=dota2&qw=kuku&rn=10&un=&only_thread=1&sm=1&sd=&ed=&pn=", page)
+
+page_url
+```
+
+Runs code on first page to extract urls for each email, subject text, and date text (`include = FALSE`)
+
+```{r}
+page_html <- xml2::read_html(page_url[1])
+
+post_url <- html_nodes(page_html, '.bluelink') %>% html_attr("href")
+subject_text <- html_nodes(page_html, '.bluelink') %>% html_text() 
+date_text <- html_nodes(page_html, '.p_date') %>% html_text() 
+author_text <- html_nodes(page_html, '.p_violet') %>% html_text() 
+subject_text <- subject_text[-c(1:4)] 
+post_url <- post_url[-c(1:4)]
+author_text <- author_text[seq_along(author_text)%%2 == 0]
+
+url_extracted <- data.frame(
+  subject = subject_text, 
+  date = date_text, 
+  author = author_text,  
+  url = paste0("http://c.tieba.baidu.com", post_url)
+)
+```
+
+# Define a function
+```{r}
+url_extractR <- function(url) {
+  page_html <- read_html(url)
+  post_url <- html_nodes(page_html, '.bluelink') %>% html_attr("href")
+  subject_text <- html_nodes(page_html, '.bluelink') %>% html_text() 
+  date_text <- html_nodes(page_html, '.p_date') %>% html_text() 
+  author_text <- html_nodes(page_html, '.p_violet') %>% html_text() 
+  subject_text <- subject_text[-c(1:4)] 
+  post_url <- post_url[-c(1:4)]
+  author_text <- author_text[seq_along(author_text) %%2 == 0]
+  return(data.frame(subject = subject_text, 
+  date = date_text, 
+  author = author_text,  
+  url = paste0("http://c.tieba.baidu.com", post_url)
+  ))
+}
+```
+
+```{r}
+url <- lapply(page_url, url_extractR)
+urls <- do.call("rbind", url)
+head(urls)
+```
+

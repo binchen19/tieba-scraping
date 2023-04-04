@@ -1,0 +1,85 @@
+```{r}
+library(rvest)
+library(tidyverse)
+```
+
+```{r}
+load("~/R/0_dissertation/saved/tieba_urls.RData")
+urls_sub <- urls_bind |>
+  subset(date >= as.Date("2018-11-01") & date <= as.Date("2018-12-10"))
+
+raw <- urls_sub$url
+id <- sub(".*/(.*)\\?.*", "\\1", raw)
+```
+
+```{r}
+# Remove rows with duplicate values in Column1
+urls_unique <- urls_sub[!duplicated(urls_sub$subject),]
+urls_unique$id <- str_extract(urls_unique$url, "(?<=/p/)\\d+(?=\\?)")
+urls_unique$url_clean <- paste0('https://tieba.baidu.com/p/',urls_unique$id)
+```
+
+```{r}
+library(rvest)
+library(purrr)
+
+# Set the list of URLs to scrape
+url_list <- urls_unique$url_clean
+
+# Define a function to scrape a single URL
+scrape_url <- function(url) {
+  Sys.sleep(3)
+  page <- read_html(url)
+  post_topic <- html_text(html_nodes(page, ".core_title_txt"))
+  reply <- html_text(html_nodes(page, ".d_post_content"))
+  author <- html_text(html_nodes(page, ".d_author .p_author_name"))
+  date_time <- html_text(html_nodes(page, ".l_post .tail-info:last-child"))
+  df_temp <- data.frame(Post_Topic = post_topic,
+                        Reply = reply,
+                        Author = author,
+                        Date_Time = date_time,
+                        stringsAsFactors = FALSE)
+  page_num <- as.integer(html_text(html_node(page, ".l_reply_num .red"))) %/% 10 + 1
+  if (!is.na(page_num) && page_num > 1) {
+    df_temp_list <- map(2:page_num, function(i) {
+      url_page <- paste0(url, "?pn=", i - 1)
+      page <- read_html(url_page)
+      post_topic <- html_text(html_nodes(page, ".core_title_txt"))
+      reply <- html_text(html_nodes(page, ".d_post_content"))
+      author <- html_text(html_nodes(page, ".d_author .p_author_name"))
+      date_time <- html_text(html_nodes(page, ".l_post .tail-info:last-child"))
+      df_temp_page <- data.frame(Post_Topic = post_topic,
+                                 Reply = reply,
+                                 Author = author,
+                                 Date_Time = date_time,
+                                 stringsAsFactors = FALSE)
+      return(df_temp_page)
+    })
+    df_temp <- do.call(rbind, c(list(df_temp), df_temp_list))
+  }
+  return(df_temp)
+}
+
+# Use possibly() to handle errors
+scrape_url_safe <- possibly(scrape_url, otherwise = NULL)
+
+# Initialize an empty list to store the results
+df_list <- list()
+
+# Loop over each URL in the list and scrape the data
+for (url in url_list[1]) {
+  # Scrape the data for the current URL and add it to the list of results
+  df_temp <- scrape_url_safe(url)
+  if (!is.null(df_temp)) {
+    df_list[[url]] <- df_temp
+  } else {
+    message(paste("Skipping URL:", url))
+  }
+}
+
+# Combine the results into a single dataframe
+df <- do.call(rbind, df_list)
+
+# Print the resulting dataframe
+print(df)
+```
